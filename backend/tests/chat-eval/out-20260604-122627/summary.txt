@@ -1,0 +1,8 @@
+﻿SessionId: a442c2da929840b59a0efd3a109f8a02
+TotalCases: 6
+Passed: 4
+Failed: 2
+PassRate: 66.7%
+P95LatencyMs: 1608
+ResultsJson: .\out-20260604-122627\results.json
+ResultsCsv: .\out-20260604-122627\results.csv

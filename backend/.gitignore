@@ -1,0 +1,9 @@
+# https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+*.log
+appsettings.*.local.json

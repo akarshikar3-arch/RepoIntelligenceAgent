@@ -1,0 +1,74 @@
+[
+  {
+    "id": "meta-files-count",
+    "category": "metadata",
+    "question": "how many files?",
+    "expectedGrounded": true,
+    "expectCannotFind": false,
+    "minCitations": 0,
+    "maxCitations": 0,
+    "mustContainAll": ["indexed repository contains"],
+    "mustContainAny": ["files"],
+    "mustNotContain": []
+  },
+  {
+    "id": "entrypoint-main",
+    "category": "entrypoint",
+    "question": "main file?",
+    "expectedGrounded": true,
+    "expectCannotFind": false,
+    "minCitations": 0,
+    "maxCitations": 0,
+    "mustContainAll": ["entrypoint"],
+    "mustContainAny": ["main.go", "cmd/generate/config/main.go"],
+    "mustNotContain": ["testdata/"]
+  },
+  {
+    "id": "usage-operate",
+    "category": "usage",
+    "question": "how to operate this application",
+    "expectedGrounded": false,
+    "expectCannotFind": true,
+    "minCitations": 0,
+    "maxCitations": 0,
+    "mustContainAll": ["I can't find that in the indexed repository."],
+    "mustContainAny": [],
+    "mustNotContain": ["SECURITY.md", "USERS.md"]
+  },
+  {
+    "id": "project-purpose",
+    "category": "summary",
+    "question": "what does this project do",
+    "expectedGrounded": true,
+    "expectCannotFind": false,
+    "minCitations": 1,
+    "maxCitations": 12,
+    "mustContainAll": [],
+    "mustContainAny": ["secret", "secrets", "scan", "detect"],
+    "mustNotContain": []
+  },
+  {
+    "id": "criticality-check",
+    "category": "risk",
+    "question": "what are the most critical issues",
+    "expectedGrounded": true,
+    "expectCannotFind": false,
+    "minCitations": 0,
+    "maxCitations": 0,
+    "mustContainAll": [],
+    "mustContainAny": ["indexed snapshot does not include true static-analysis criticality", "highest-risk files"],
+    "mustNotContain": []
+  },
+  {
+    "id": "unknown-question",
+    "category": "fallback",
+    "question": "what is the weather in london now",
+    "expectedGrounded": false,
+    "expectCannotFind": true,
+    "minCitations": 0,
+    "maxCitations": 0,
+    "mustContainAll": ["I can't find that in the indexed repository."],
+    "mustContainAny": [],
+    "mustNotContain": []
+  }
+]

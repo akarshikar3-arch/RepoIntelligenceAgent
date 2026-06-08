@@ -1,0 +1,32 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Logs
+*.log
+
+# Node / frontend
+**/node_modules/
+**/dist/
+**/.angular/cache/
+
+# .NET / backend
+**/bin/
+**/obj/
+*.user
+*.suo
+
+# Local config and secrets
+**/appsettings.*.local.json
+.env
+.env.*
+
+# Test outputs
+**/coverage/
+**/TestResults/
+chatbot-test-results.json

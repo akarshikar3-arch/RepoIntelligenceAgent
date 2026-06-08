@@ -1,0 +1,116 @@
+<section class="landing">
+  <header class="hero">
+    <span class="eyebrow">Agent Hub · Repo Intelligence</span>
+    <h1>Understand any repository in minutes.</h1>
+    <p class="lede">
+      Paste a GitHub URL or drop in a snippet. Get a premium dashboard with
+      architecture insight, risk hotspots, and a context-grounded code assistant.
+    </p>
+  </header>
+
+  <div class="card glass">
+    <div class="tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        [class.active]="mode() === 'repo'"
+        [attr.aria-selected]="mode() === 'repo'"
+        (click)="setMode('repo')"
+      >
+        <span class="tab-icon">link</span>
+        GitHub repository
+      </button>
+      <button
+        type="button"
+        role="tab"
+        [class.active]="mode() === 'snippet'"
+        [attr.aria-selected]="mode() === 'snippet'"
+        (click)="setMode('snippet')"
+      >
+        <span class="tab-icon">code</span>
+        Code snippet
+      </button>
+    </div>
+
+    @if (mode() === 'repo') {
+      <div class="form-grid">
+        <label class="field">
+          <span>Repository URL</span>
+          <input
+            #repoUrlInput
+            type="url"
+            placeholder="https://github.com/owner/repo"
+            [ngModel]="repoUrl()"
+            (ngModelChange)="repoUrl.set($event)"
+            (input)="repoUrl.set(($any($event.target).value ?? '').trim())"
+            name="repoUrl"
+          />
+        </label>
+        <label class="field">
+          <span>Branch <em>(optional)</em></span>
+          <input
+            type="text"
+            placeholder="main"
+            [ngModel]="branch()"
+            (ngModelChange)="branch.set($event)"
+            name="branch"
+          />
+        </label>
+      </div>
+    } @else {
+      <div class="snippets">
+        @for (s of snippets(); track $index; let i = $index) {
+          <div class="snippet">
+            <div class="snippet-meta">
+              <input
+                class="snippet-name"
+                type="text"
+                [ngModel]="s.name"
+                (ngModelChange)="updateSnippet(i, { name: $event })"
+                [name]="'name-' + i"
+              />
+              <input
+                class="snippet-lang"
+                type="text"
+                placeholder="language"
+                [ngModel]="s.language"
+                (ngModelChange)="updateSnippet(i, { language: $event })"
+                [name]="'lang-' + i"
+              />
+              @if (snippets().length > 1) {
+                <button type="button" class="ghost danger" (click)="removeSnippet(i)">
+                  Remove
+                </button>
+              }
+            </div>
+            <textarea
+              spellcheck="false"
+              placeholder="Paste code here…"
+              [ngModel]="s.content"
+              (ngModelChange)="updateSnippet(i, { content: $event })"
+              [name]="'content-' + i"
+            ></textarea>
+          </div>
+        }
+        <button type="button" class="ghost" (click)="addSnippet()">
+          + Add another file
+        </button>
+      </div>
+    }
+
+    <footer class="actions">
+      <a routerLink="/" class="ghost">Back to Hub</a>
+      <button
+        type="button"
+        class="primary"
+        [disabled]="!canSubmit() || submitting()"
+        (click)="submit()"
+      >
+        {{ submitting() ? 'Analyzing…' : 'Analyze' }}
+      </button>
+    </footer>
+    @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+    }
+  </div>
+</section>

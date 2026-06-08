@@ -1,0 +1,95 @@
+<div class="chat-panel">
+  <header class="head">
+    <div class="title">
+      <span class="material-symbols">smart_toy</span>
+      <h3>Ask the Code</h3>
+    </div>
+    <button
+      type="button"
+      class="icon-btn"
+      title="Clear chat"
+      (click)="clear()"
+      [disabled]="busy() || turns().length === 0"
+    >
+      <span class="material-symbols">delete_sweep</span>
+    </button>
+  </header>
+
+  <div class="messages" #scrollHost>
+    @if (turns().length === 0) {
+      <div class="empty">
+        <span class="material-symbols">tips_and_updates</span>
+        <p>
+          Ask questions about this repository. Answers are grounded in the
+          indexed code chunks and include citations.
+        </p>
+        <ul class="hints">
+          @for (hint of hintQuestions(); track hint) {
+            <li>{{ hint }}</li>
+          }
+        </ul>
+        <div class="quick-prompts">
+          @for (prompt of quickPrompts(); track prompt) {
+            <button type="button" class="prompt-chip" (click)="usePrompt(prompt)">
+              {{ prompt }}
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    @for (turn of turns(); track $index) {
+      <article class="turn" [attr.data-role]="turn.role">
+        <div class="bubble">
+          <p class="content">{{ turn.content }}</p>
+
+          @if (turn.role === 'assistant' && turn.citations && turn.citations.length > 0) {
+            <ul class="citations">
+              @for (c of turn.citations; track $index) {
+                <li>
+                  <button type="button" class="cite" (click)="onCitation(c)">
+                    <span class="num">[{{ $index + 1 }}]</span>
+                    <span class="path">{{ c.file }}</span>
+                    <span class="lines">L{{ c.startLine }}–{{ c.endLine }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </article>
+    }
+
+    @if (busy()) {
+      <article class="turn" data-role="assistant">
+        <div class="bubble pending">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+      </article>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="error-bar" role="alert">{{ error() }}</div>
+  }
+
+  <footer class="composer">
+    <textarea
+      rows="2"
+      placeholder="Ask about this repository…"
+      [ngModel]="draft()"
+      (ngModelChange)="draft.set($event)"
+      (keydown)="onComposerKey($event)"
+      [disabled]="disabled() || busy()"
+    ></textarea>
+    <button
+      type="button"
+      class="primary"
+      (click)="send()"
+      [disabled]="!canSend()"
+    >
+      <span class="material-symbols">send</span>
+    </button>
+  </footer>
+  <div class="composer-hint">{{ composerHint() }}</div>
+</div>

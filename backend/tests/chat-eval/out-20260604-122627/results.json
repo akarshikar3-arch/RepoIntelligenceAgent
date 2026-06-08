@@ -1,0 +1,68 @@
+﻿[
+    {
+        "id":  "meta-files-count",
+        "category":  "metadata",
+        "question":  "how many files?",
+        "pass":  true,
+        "grounded":  true,
+        "citationCount":  0,
+        "latencyMs":  7,
+        "content":  "The indexed repository contains 454 files (source: 374, test: 1, config: 66, docs: 13).",
+        "failedChecks":  ""
+    },
+    {
+        "id":  "entrypoint-main",
+        "category":  "entrypoint",
+        "question":  "main file?",
+        "pass":  true,
+        "grounded":  true,
+        "citationCount":  0,
+        "latencyMs":  5,
+        "content":  "I found multiple possible entrypoints in the indexed repository: cmd/generate/config/main.go, main.go.",
+        "failedChecks":  ""
+    },
+    {
+        "id":  "usage-operate",
+        "category":  "usage",
+        "question":  "how to operate this application",
+        "pass":  true,
+        "grounded":  false,
+        "citationCount":  0,
+        "latencyMs":  1608,
+        "content":  "I can\u0027t find that in the indexed repository.",
+        "failedChecks":  ""
+    },
+    {
+        "id":  "project-purpose",
+        "category":  "summary",
+        "question":  "what does this project do",
+        "pass":  false,
+        "grounded":  false,
+        "citationCount":  0,
+        "latencyMs":  74,
+        "content":  "The language model is unavailable. Please verify the AI:Llm configuration and try again.",
+        "failedChecks":  "expectedGrounded: expected=True actual=False | minCitations: min=1 actual=0 | mustContainAny: tokens=secret; secrets; scan; detect"
+    },
+    {
+        "id":  "criticality-check",
+        "category":  "risk",
+        "question":  "what are the most critical issues",
+        "pass":  true,
+        "grounded":  true,
+        "citationCount":  0,
+        "latencyMs":  14,
+        "content":  "The indexed snapshot does not include true static-analysis criticality per file. As a size/complexity proxy, highest-risk files are: detect/detect_test.go (2773 lines), cmd/generate/config/rules/stopwords.go (1491 lines), .gitleaksignore (944 lines), detect/detect.go (900 lines), report_templates/leet.tmpl (847 lines).",
+        "failedChecks":  ""
+    },
+    {
+        "id":  "unknown-question",
+        "category":  "fallback",
+        "question":  "what is the weather in london now",
+        "pass":  false,
+        "grounded":  false,
+        "citationCount":  0,
+        "latencyMs":  71,
+        "content":  "The language model is unavailable. Please verify the AI:Llm configuration and try again.",
+        "failedChecks":  "expectCannotFind: expectedExact=\u0027I can\u0027t find that in the indexed repository.\u0027 actual=\u0027The language model is unavailable. Please verify the AI:Llm configuration and try again.\u0027 | mustContainAll: tokens=I can\u0027t find that in the indexed repository."
+    }
+]

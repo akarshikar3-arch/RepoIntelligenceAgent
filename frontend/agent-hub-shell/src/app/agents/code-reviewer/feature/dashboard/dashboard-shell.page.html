@@ -1,0 +1,83 @@
+<section class="shell" [class.chat-open]="chatOpen()">
+  <header class="topbar glass">
+    <div class="title">
+      <span class="kind-badge">SESSION</span>
+      <h2>{{ store.summary()?.title ?? 'Repository Intelligence' }}</h2>
+      <span class="subtitle">{{ sessionId() }}</span>
+    </div>
+
+    <div class="hero-stats">
+      <div class="chip">
+        <span class="chip-label">Framework</span>
+        <span class="chip-value">{{ frameworkLabel() }}</span>
+      </div>
+      <div class="chip">
+        <span class="chip-label">Language</span>
+        <span class="chip-value">{{ languageLabel() }}</span>
+      </div>
+      <div class="chip score">
+        <span class="chip-label">Health</span>
+        <span class="chip-value">{{ healthLabel() }}</span>
+      </div>
+      <div class="chip score">
+        <span class="chip-label">Confidence</span>
+        <span class="chip-value">{{ confidenceLabel() }}</span>
+      </div>
+
+      <div class="hero-actions">
+        <button type="button" class="review-another" (click)="startAnotherReview()">
+          <span class="material-symbols">add_circle</span>
+          New review
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabnav glass" aria-label="Insight tabs">
+    @for (tab of tabs; track tab.path) {
+      <a
+        [routerLink]="['./', tab.path]"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: false }"
+      >
+        <span class="material-symbols">{{ tab.icon }}</span>
+        {{ tab.label }}
+      </a>
+    }
+
+    <button
+      type="button"
+      class="tab-ask"
+      (click)="toggleChat()"
+      [attr.aria-pressed]="chatOpen()"
+      [class.active]="chatOpen()"
+    >
+      <span class="material-symbols">smart_toy</span>
+      Ask the code
+    </button>
+  </nav>
+
+  <main class="content">
+    @if (sessionMissing()) {
+      <section class="session-expired" role="alert">
+        <p>This session is no longer available (backend restarted or session expired).</p>
+        <button type="button" class="review-another" (click)="startAnotherReview()">
+          <span class="material-symbols">add_circle</span>
+          Start new review
+        </button>
+      </section>
+    }
+    <router-outlet />
+  </main>
+
+  <aside class="chat-drawer glass" [attr.aria-hidden]="!chatOpen()">
+    @if (sessionId()) {
+      <cr-chat-panel
+        [sessionId]="sessionId()"
+        [activeTab]="activeTab()"
+        [disabled]="!isChatReady()"
+        (citationClicked)="onCitationClicked($event)"
+      />
+    }
+  </aside>
+</section>

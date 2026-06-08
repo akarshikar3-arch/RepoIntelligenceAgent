@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>RepoIntel.Api</RootNamespace>
+    <AssemblyName>RepoIntel.Api</AssemblyName>
+    <UserSecretsId>repointel-api-9b4c</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RepoIntel.Application\RepoIntel.Application.csproj" />
+    <ProjectReference Include="..\RepoIntel.Infrastructure\RepoIntel.Infrastructure.csproj" />
+    <ProjectReference Include="..\RepoIntel.Contracts\RepoIntel.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.8" />
+  </ItemGroup>
+</Project>

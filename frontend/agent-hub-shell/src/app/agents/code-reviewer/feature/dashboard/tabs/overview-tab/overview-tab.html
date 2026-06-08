@@ -1,0 +1,180 @@
+@if (status() === 'loading') {
+  <section class="analysis-loading glass">
+    <div class="status-head">
+      <span class="material-symbols spin">progress_activity</span>
+      <div>
+        <h3>Analyzing Repository…</h3>
+        <p>
+          We are processing {{ summary()?.title ?? 'your repository' }}.
+          This usually takes under a minute for medium-sized repos.
+        </p>
+      </div>
+    </div>
+
+    <div class="status-meta">
+      <span class="meta-pill">Status: {{ sessionStatusLabel() }}</span>
+      <span class="meta-pill">Framework: {{ summary()?.framework ?? 'Detecting…' }}</span>
+      <span class="meta-pill">Language: {{ summary()?.primaryLanguage ?? 'Detecting…' }}</span>
+    </div>
+
+    <div class="progress-track" aria-hidden="true">
+      <span class="progress-fill" [style.width.%]="loadingProgressPercent()"></span>
+    </div>
+
+    <ul class="progress-list">
+      @for (step of analyzingSteps; track step; let i = $index) {
+        <li [attr.data-state]="loadingStepState(i)">
+          <span class="dot" aria-hidden="true"></span>
+          <span>{{ step }}</span>
+          <span class="state">{{ loadingStepState(i) }}</span>
+        </li>
+      }
+    </ul>
+
+    <p class="hint">Updates automatically as analysis events arrive.</p>
+  </section>
+} @else if (status() === 'error') {
+  <div class="state-card error">
+    <span class="material-symbols">error</span>
+    <p>{{ error() ?? 'Could not load metrics.' }}</p>
+  </div>
+} @else {
+  <section class="overview" *ngIf="metrics() as m">
+    <cr-panel-card class="compact-overall" title="Overall Insight" icon="psychology">
+      <p class="overall-insight">{{ overallInsight() }}</p>
+      <p class="overall-impact">{{ impactSummary() }}</p>
+    </cr-panel-card>
+
+    <div class="lead-grid">
+      <div
+        class="verdict-link"
+        role="link"
+        tabindex="0"
+        (click)="openVerdictTab()"
+        (keydown.enter)="openVerdictTab()"
+        (keydown.space)="openVerdictTab(); $event.preventDefault()"
+      >
+        <cr-panel-card class="fill" title="Merge Readiness" icon="gavel" subtitle="pull request status">
+          <div class="review-top">
+            <div class="score-ring" [attr.data-score-tone]="criticalFindings().length > 0 ? 'critical' : warningFindings().length > 0 ? 'warning' : 'safe'">
+              <strong>{{ reviewScore() }}</strong>
+              <small>/10</small>
+            </div>
+            <div class="review-meta">
+              <div class="chips">
+                <span class="chip critical">{{ criticalFindings().length }} Critical</span>
+                <span class="chip warning">{{ warningFindings().length }} Warnings</span>
+              </div>
+              <p class="merge-note">{{ mergeVerdict() }}</p>
+              <p class="merge-subtext">{{ mergeSubtext() }}</p>
+              <span class="verdict-link-label">{{ verdictRouteLabel() }}</span>
+            </div>
+          </div>
+
+          <div class="review-panels">
+            <section class="review-panel" [attr.data-tone]="warningFindings().length > 0 ? 'warning' : 'safe'">
+              <header>
+                <h4>Watchlist</h4>
+                <span class="count">{{ warningFindings().length }}</span>
+              </header>
+              @if (watchlistHighlights().length > 0) {
+                <ul class="watchlist-items">
+                  @for (item of watchlistHighlights(); track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              } @else {
+                <p class="empty-note">No warnings detected.</p>
+              }
+            </section>
+
+            <section class="review-panel" [attr.data-tone]="criticalFindings().length > 0 ? 'critical' : 'safe'">
+              <header>
+                <h4>Blocking issues</h4>
+                <span class="count">{{ criticalFindings().length }}</span>
+              </header>
+              @if (criticalFindings()[0]; as f) {
+                <p class="msg">{{ f.message }}</p>
+                <p class="meta">{{ f.category }} · {{ f.file }}:{{ f.line }}</p>
+              } @else {
+                <p class="empty-note">No critical issues detected.</p>
+              }
+            </section>
+          </div>
+        </cr-panel-card>
+      </div>
+
+      <cr-panel-card title="Deep Dive" icon="north_east" subtitle="jump to tab">
+        <div class="top-issue">
+          <p class="issue-kicker">Top Issue</p>
+          <p class="issue-title">{{ topIssue().title }}</p>
+          <p class="issue-detail">{{ topIssue().detail }}</p>
+          <span class="priority-tag">Priority: {{ topIssue().priority }}</span>
+          <p class="impact-kicker">Potential impact:</p>
+          <ul class="issue-impact">
+            <li>Slower review cycles</li>
+            <li>Reduced module clarity</li>
+          </ul>
+        </div>
+      </cr-panel-card>
+    </div>
+
+    <div class="kpi-grid">
+      <cr-kpi-card label="Files" icon="description" [value]="m.totalFiles" />
+      <cr-kpi-card label="Folders" icon="folder" [value]="m.totalFolders" />
+      <cr-kpi-card label="Languages" icon="translate" [value]="languageCount()" />
+      <cr-kpi-card
+        label="Findings"
+        icon="rule"
+        [value]="findingsTotal()"
+        [tone]="(findingsTotal() ?? 0) > 0 ? 'warning' : 'success'"
+      />
+    </div>
+
+    <div class="analytics-grid analytics-grid--primary">
+      <cr-panel-card class="fill body-scroll" title="Findings by severity" icon="rule">
+        <cr-severity-bar [counts]="m.findingsBySeverity" />
+      </cr-panel-card>
+
+      <cr-panel-card class="fill body-scroll" title="Language distribution" icon="bar_chart">
+        <cr-language-bar [buckets]="m.languages" />
+      </cr-panel-card>
+
+      <cr-panel-card class="fill body-scroll" title="Hotspots — largest files" icon="local_fire_department">
+        <cr-hotspot-list [files]="m.largestFiles" />
+      </cr-panel-card>
+
+      <cr-panel-card class="fill body-scroll" title="File category mix" icon="pie_chart">
+        <cr-category-breakdown [breakdown]="m.categories" />
+      </cr-panel-card>
+    </div>
+
+    @if (angular() || dotnet()) {
+      <div class="composition-grid">
+        @if (angular(); as a) {
+          <cr-panel-card title="Angular composition" icon="code" subtitle="components & DI">
+            <ul class="mini-grid">
+              <li><span class="lbl">Components</span><strong>{{ a.components | number }}</strong></li>
+              <li><span class="lbl">Services</span><strong>{{ a.services | number }}</strong></li>
+              <li><span class="lbl">Modules</span><strong>{{ a.modules | number }}</strong></li>
+              <li><span class="lbl">Guards</span><strong>{{ a.guards | number }}</strong></li>
+              <li><span class="lbl">Interceptors</span><strong>{{ a.interceptors | number }}</strong></li>
+              <li><span class="lbl">Pipes</span><strong>{{ a.pipes | number }}</strong></li>
+            </ul>
+          </cr-panel-card>
+        }
+
+        @if (dotnet(); as d) {
+          <cr-panel-card title=".NET composition" icon="memory" subtitle="API & domain">
+            <ul class="mini-grid">
+              <li><span class="lbl">Controllers</span><strong>{{ d.controllers | number }}</strong></li>
+              <li><span class="lbl">Services</span><strong>{{ d.services | number }}</strong></li>
+              <li><span class="lbl">Entities</span><strong>{{ d.entities | number }}</strong></li>
+              <li><span class="lbl">Repositories</span><strong>{{ d.repositories | number }}</strong></li>
+            </ul>
+          </cr-panel-card>
+        }
+      </div>
+    }
+  </section>
+}

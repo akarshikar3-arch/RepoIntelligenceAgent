@@ -1,0 +1,25 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Frontend Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"start",
+				"--",
+				"--port",
+				"4200"
+			],
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Frontend Dev Server (agent-hub-shell)",
+			"type": "shell",
+			"command": "Set-Location \"frontend\\agent-hub-shell\"; npm start -- --port 4200",
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}
