@@ -85,7 +85,8 @@ public sealed class SessionController : ControllerBase
                 SessionStatus.Ready => SessionStatusDto.Ready,
                 SessionStatus.Error => SessionStatusDto.Error,
                 _ => SessionStatusDto.Pending,
-            });
+            },
+            s.Error);
 
     private static DashboardMetricsDto BuildMetrics(
         RepoSession s,

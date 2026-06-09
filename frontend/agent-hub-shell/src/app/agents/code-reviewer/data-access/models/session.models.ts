@@ -54,4 +54,5 @@ export interface SessionSummary {
   confidenceScore?: number;
   createdAt: string;
   status: 'pending' | 'running' | 'ready' | 'error';
+  error?: string | null;
 }

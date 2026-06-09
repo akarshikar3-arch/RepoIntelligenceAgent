@@ -80,7 +80,9 @@ export class OverviewTab {
               status: (isReady ? 'ready' : isError ? 'error' : 'loading') as MetricsState['status'],
               data: isReady ? overview.metrics : null,
               findings: isReady ? overview.findings : [],
-              error: isError ? 'Analysis failed. Please retry ingest.' : null,
+              error: isError
+                ? (overview.session.error?.trim() || 'Analysis failed. Please retry ingest.')
+                : null,
               sessionStatus,
             };
           }),

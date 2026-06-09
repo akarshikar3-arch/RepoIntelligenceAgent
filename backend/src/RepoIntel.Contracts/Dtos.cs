@@ -19,7 +19,8 @@ public sealed record SessionSummaryDto(
     int? HealthScore,
     int? ConfidenceScore,
     DateTimeOffset CreatedAt,
-    SessionStatusDto Status);
+    SessionStatusDto Status,
+    string? Error);
 
 public sealed record FileTypeBucket(string Extension, int Count, long Bytes);
 public sealed record LanguageBucket(string Language, int Files, long Bytes);
