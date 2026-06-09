@@ -54,12 +54,8 @@
         (keydown.enter)="openVerdictTab()"
         (keydown.space)="openVerdictTab(); $event.preventDefault()"
       >
-        <cr-panel-card class="fill" title="Merge Readiness" icon="gavel" subtitle="pull request status">
+        <cr-panel-card class="fill" title="Risk & Action Summary" icon="gavel" subtitle="review guidance">
           <div class="review-top">
-            <div class="score-ring" [attr.data-score-tone]="criticalFindings().length > 0 ? 'critical' : warningFindings().length > 0 ? 'warning' : 'safe'">
-              <strong>{{ reviewScore() }}</strong>
-              <small>/10</small>
-            </div>
             <div class="review-meta">
               <div class="chips">
                 <span class="chip critical">{{ criticalFindings().length }} Critical</span>
@@ -90,14 +86,14 @@
 
             <section class="review-panel" [attr.data-tone]="criticalFindings().length > 0 ? 'critical' : 'safe'">
               <header>
-                <h4>Blocking issues</h4>
+                <h4>Priority issues</h4>
                 <span class="count">{{ criticalFindings().length }}</span>
               </header>
               @if (criticalFindings()[0]; as f) {
                 <p class="msg">{{ f.message }}</p>
                 <p class="meta">{{ f.category }} · {{ f.file }}:{{ f.line }}</p>
               } @else {
-                <p class="empty-note">No critical issues detected.</p>
+                <p class="empty-note">No critical issues detected in this run.</p>
               }
             </section>
           </div>

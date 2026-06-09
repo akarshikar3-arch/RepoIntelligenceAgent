@@ -173,15 +173,15 @@ export class OverviewTab {
   protected readonly mergeVerdict = computed(() => {
     const critical = this.criticalFindings().length;
     const high = this.findings().filter(f => f.severity === 'high').length;
-    if (critical > 0) return 'Do not merge - blocking issues found';
-    if (high > 0) return 'Safe to merge (no blocking issues), but high-priority items need attention';
-    return 'Safe to merge (no blocking issues)';
+    if (critical > 0) return 'Action required before merge: critical findings detected';
+    if (high > 0) return 'Merge with caution: high-priority findings should be addressed soon';
+    return 'No blocking issues detected for this analysis run';
   });
 
   protected readonly mergeSubtext = computed(() => {
     const warnings = this.warningFindings().length;
-    if (warnings === 0) return 'No non-blocking issues currently on watchlist.';
-    return `${warnings} non-blocking issues should be addressed over time.`;
+    if (warnings === 0) return 'No non-blocking items currently on the watchlist.';
+    return `${warnings} non-blocking items are recommended for follow-up.`;
   });
 
   protected readonly verdictRoute = computed(() =>
@@ -204,12 +204,12 @@ export class OverviewTab {
     const critical = this.criticalFindings().length;
     const warnings = this.warningFindings().length;
     if (critical > 0) {
-      return 'Overall Insight: This repository has blocking risk due to critical issues and needs remediation before merge.';
+      return 'Overall Insight: Critical findings were detected; targeted remediation is recommended before merge.';
     }
     if (warnings > 0) {
-      return 'Overall Insight: This repository is moderately healthy and safe to merge, but non-blocking issues and large files indicate maintainability risk.';
+      return 'Overall Insight: Repository health is generally good, with non-blocking findings worth addressing over time.';
     }
-    return 'Overall Insight: This repository is healthy with no blocking findings and low immediate risk.';
+    return 'Overall Insight: Repository health is strong with no blocking findings in this analysis run.';
   });
 
   protected readonly impactSummary = computed(() => {

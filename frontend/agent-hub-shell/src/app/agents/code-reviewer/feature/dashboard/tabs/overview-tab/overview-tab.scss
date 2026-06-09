@@ -358,27 +358,10 @@
 
 .review-top {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 1fr;
   gap: 0.6rem;
   align-items: center;
   margin-bottom: 0.45rem;
-}
-
-.score-ring {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: color-mix(in srgb, var(--bg-1) 74%, transparent);
-  border: 3px solid rgba(255, 255, 255, 0.14);
-
-  strong { font-size: 1.4rem; color: var(--text-1, #fff); line-height: 1; }
-  small { color: var(--text-2, #b8bdd1); font-size: 0.72rem; }
-
-  &[data-score-tone='critical'] { border-color: rgba(255, 56, 96, 0.85); }
-  &[data-score-tone='warning'] { border-color: rgba(255, 181, 71, 0.85); }
-  &[data-score-tone='safe'] { border-color: rgba(46, 230, 166, 0.85); }
 }
 
 .review-meta {
