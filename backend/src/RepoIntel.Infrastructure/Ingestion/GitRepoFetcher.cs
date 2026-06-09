@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RepoIntel.Application.Abstractions;
@@ -185,18 +187,24 @@ public sealed class GitRepoFetcher : IRepoFetcher
         string workDir,
         CancellationToken ct)
     {
-        var branchOrHead = string.IsNullOrWhiteSpace(branch) ? "HEAD" : branch.Trim();
-        var archiveUrl = $"https://github.com/{owner}/{repo}/archive/refs/heads/{branchOrHead}.zip";
-
         using var http = new HttpClient();
         http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("RepoIntel", "1.0"));
 
-        _logger.LogInformation(
-            "Session {SessionId}: downloading GitHub archive {ArchiveUrl}",
-            sessionId,
-            archiveUrl);
+        var branchCandidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(branch))
+            branchCandidates.Add(branch.Trim());
 
-        await using var response = await http.GetStreamAsync(archiveUrl, ct).ConfigureAwait(false);
+        var defaultBranch = await TryGetGithubDefaultBranchAsync(http, owner, repo, ct).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(defaultBranch))
+            branchCandidates.Add(defaultBranch);
+
+        branchCandidates.Add("main");
+        branchCandidates.Add("master");
+
+        branchCandidates = branchCandidates
+            .Where(b => !string.IsNullOrWhiteSpace(b))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         var tempRoot = Path.Combine(Path.GetTempPath(), "repointel-archive", sessionId);
         var zipPath = Path.Combine(tempRoot, "repo.zip");
@@ -208,21 +216,77 @@ public sealed class GitRepoFetcher : IRepoFetcher
         }
         Directory.CreateDirectory(tempRoot);
 
-        await using (var fs = File.Create(zipPath))
+        HttpStatusCode? lastStatus = null;
+        string? lastArchiveUrl = null;
+
+        foreach (var candidate in branchCandidates)
         {
-            await response.CopyToAsync(fs, ct).ConfigureAwait(false);
+            var archiveUrl = $"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/{candidate}";
+            lastArchiveUrl = archiveUrl;
+
+            _logger.LogInformation(
+                "Session {SessionId}: downloading GitHub archive {ArchiveUrl}",
+                sessionId,
+                archiveUrl);
+
+            using var resp = await http.GetAsync(
+                archiveUrl,
+                HttpCompletionOption.ResponseHeadersRead,
+                ct).ConfigureAwait(false);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                lastStatus = resp.StatusCode;
+                continue;
+            }
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"GitHub archive download failed ({(int)resp.StatusCode}) for '{candidate}': {Truncate(body, 250)}");
+            }
+
+            await using (var fs = File.Create(zipPath))
+            await using (var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
+            {
+                await stream.CopyToAsync(fs, ct).ConfigureAwait(false);
+            }
+
+            Directory.CreateDirectory(unzipPath);
+            ZipFile.ExtractToDirectory(zipPath, unzipPath, overwriteFiles: true);
+
+            var extractedRoot = Directory
+                .EnumerateDirectories(unzipPath)
+                .FirstOrDefault() ?? unzipPath;
+
+            CopyDirectoryContents(extractedRoot, workDir);
+            try { Directory.Delete(tempRoot, recursive: true); } catch { }
+            return;
         }
 
-        Directory.CreateDirectory(unzipPath);
-        ZipFile.ExtractToDirectory(zipPath, unzipPath, overwriteFiles: true);
+        throw new InvalidOperationException(
+            $"GitHub archive download failed ({(lastStatus.HasValue ? (int)lastStatus.Value : 0)}) for all branch candidates ({string.Join(", ", branchCandidates)}). Last URL: {lastArchiveUrl}");
+    }
 
-        var extractedRoot = Directory
-            .EnumerateDirectories(unzipPath)
-            .FirstOrDefault() ?? unzipPath;
+    private static async Task<string?> TryGetGithubDefaultBranchAsync(
+        HttpClient http,
+        string owner,
+        string repo,
+        CancellationToken ct)
+    {
+        var url = $"https://api.github.com/repos/{owner}/{repo}";
 
-        CopyDirectoryContents(extractedRoot, workDir);
+        using var resp = await http.GetAsync(url, ct).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+            return null;
 
-        try { Directory.Delete(tempRoot, recursive: true); } catch { }
+        await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
+        if (doc.RootElement.TryGetProperty("default_branch", out var prop) && prop.ValueKind == JsonValueKind.String)
+            return prop.GetString();
+
+        return null;
     }
 
     private static void CopyDirectoryContents(string sourceDir, string targetDir)
