@@ -40,6 +40,27 @@ public sealed class ChatOrchestrator : IChatOrchestrator
     private static readonly Regex RiskyFilesQuestion = new(
         @"\b(top\s*\d*\s*)?risky files?\b|\bhighest[- ]risk files?\b|\bwhich files?\b.*\brisky\b|\brisky\b.*\bfiles?\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ModuleConnectionsQuestion = new(
+        @"\b(how are|show|list|explain)\b.*\b(modules?|components?)\b.*\b(connected|connect|relationships?|dependencies?)\b|\bmajor modules?\b.*\bconnected\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex CoupledComponentsQuestion = new(
+        @"\b(most|highest|top)\b.*\b(coupled|coupling)\b.*\b(components?|modules?|services?)\b|\bwhich\b.*\bcomponents?\b.*\bmost\b.*\bcoupled\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TopQualityIssuesQuestion = new(
+        @"\b(top|main|highest|biggest)\b.*\b(code\s*quality|quality)\b.*\b(issues?|findings?)\b|\bcode\s*quality\b.*\b(issues?|findings?)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex MaintainabilityFirstQuestion = new(
+        @"\b(fix(ed)? first|first to fix|prioritize|priority)\b.*\b(maintainability|technical debt|tech debt|code health)\b|\bmaintainability\b.*\b(fix|improve|first)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ProductionImpactFindingsQuestion = new(
+        @"\b(findings?|issues?)\b.*\b(affect|impact)\b.*\bproduction\b|\bproduction\b.*\b(findings?|issues?)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex PerformanceHotspotsQuestion = new(
+        @"\b(biggest|top|main)\b.*\b(performance)\b.*\b(hotspots?|risks?|issues?)\b|\bperformance\b.*\b(hotspots?|risks?)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex PerformanceBeforeProdQuestion = new(
+        @"\b(improve|optimi[sz]e|what can improve|what should improve)\b.*\bperformance\b.*\b(before|prior to)\b.*\bproduction\b|\bperformance\b.*\bbefore production\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex SecurityFindingsQuestion = new(
         @"\b(security findings|security issues|security only|only security|show .*security|sec findings?|sec issues?|secret leaks? detected|leaked secrets?|creds|credentials|tokens?)\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -514,6 +535,71 @@ public sealed class ChatOrchestrator : IChatOrchestrator
             return $"Indexed repo summary: {totalFiles} files total (source: {sourceFiles}, test: {testFiles}, config: {configFiles}, docs: {docFiles}). Ask for criticals, warnings, security findings, entrypoint, or risky files for more detail.";
         }
 
+        if (ModuleConnectionsQuestion.IsMatch(question))
+        {
+            var graph = session.Architecture;
+            if (graph is null || graph.Nodes.Count == 0 || graph.Edges.Count == 0)
+                return "I can't find module connection data in this session yet.";
+
+            var nodeById = graph.Nodes.ToDictionary(n => n.Id, n => n, StringComparer.OrdinalIgnoreCase);
+            var topConnections = graph.Edges
+                .Where(e => string.Equals(e.Kind, "depends-on", StringComparison.OrdinalIgnoreCase))
+                .Where(e => nodeById.TryGetValue(e.From, out var from) && from.Kind == Domain.Architecture.NodeKind.Module)
+                .Where(e => nodeById.TryGetValue(e.To, out var to) && to.Kind == Domain.Architecture.NodeKind.Module)
+                .GroupBy(e => (e.From, e.To))
+                .OrderByDescending(g => g.Count())
+                .Take(8)
+                .Select(g => $"{g.Key.From} -> {g.Key.To}")
+                .ToList();
+
+            if (topConnections.Count == 0)
+                return "I found architecture data, but no clear module-to-module dependency edges.";
+
+            return $"Major module connections (from architecture graph): {string.Join("; ", topConnections)}.";
+        }
+
+        if (CoupledComponentsQuestion.IsMatch(question))
+        {
+            var graph = session.Architecture;
+            if (graph is null || graph.Nodes.Count == 0 || graph.Edges.Count == 0)
+                return "I can't determine coupling because architecture graph data is not available yet.";
+
+            var interestingKinds = new HashSet<Domain.Architecture.NodeKind>
+            {
+                Domain.Architecture.NodeKind.Component,
+                Domain.Architecture.NodeKind.Service,
+                Domain.Architecture.NodeKind.Controller,
+                Domain.Architecture.NodeKind.Repository,
+                Domain.Architecture.NodeKind.Module,
+            };
+
+            var nodeById = graph.Nodes.ToDictionary(n => n.Id, n => n, StringComparer.OrdinalIgnoreCase);
+            var degree = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var e in graph.Edges.Where(e => string.Equals(e.Kind, "depends-on", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (nodeById.TryGetValue(e.From, out var from) && interestingKinds.Contains(from.Kind))
+                    degree[e.From] = degree.GetValueOrDefault(e.From) + 1;
+                if (nodeById.TryGetValue(e.To, out var to) && interestingKinds.Contains(to.Kind))
+                    degree[e.To] = degree.GetValueOrDefault(e.To) + 1;
+            }
+
+            var topCoupled = degree
+                .OrderByDescending(kv => kv.Value)
+                .Take(5)
+                .Select(kv =>
+                {
+                    var label = nodeById.TryGetValue(kv.Key, out var n) ? n.Label : kv.Key;
+                    return $"{label} ({kv.Value} links)";
+                })
+                .ToList();
+
+            if (topCoupled.Count == 0)
+                return "I found no strong coupling hotspots in the current architecture graph.";
+
+            return $"Most coupled components/modules by dependency links: {string.Join(", ", topCoupled)}.";
+        }
+
         if (DependencyQuestion.IsMatch(question))
         {
             var manifests = snapshot.Files
@@ -528,6 +614,118 @@ public sealed class ChatOrchestrator : IChatOrchestrator
                 return "I can't find dependency manifest files in the indexed repository snapshot.";
 
             return $"Dependency manifest files ({manifests.Count} shown): {string.Join(", ", manifests)}.";
+        }
+
+        if (TopQualityIssuesQuestion.IsMatch(question))
+        {
+            var quality = GetEffectiveFindings(session)
+                .Where(f => f.Category == Domain.Insights.FindingCategory.Quality)
+                .OrderBy(f => SeverityRank(f.Severity))
+                .ThenBy(f => f.File, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(f => f.Line)
+                .Take(8)
+                .ToList();
+
+            if (quality.Count == 0)
+                return "No code quality findings are present in this indexed session.";
+
+            return $"Top code quality issues: {string.Join("; ", quality.Select(f => $"{f.Severity} {f.RuleId} at {f.File}:{f.Line}"))}.";
+        }
+
+        if (MaintainabilityFirstQuestion.IsMatch(question))
+        {
+            var findings = GetEffectiveFindings(session)
+                .Where(f => f.Category == Domain.Insights.FindingCategory.Quality || f.Category == Domain.Insights.FindingCategory.Architecture)
+                .OrderBy(f => SeverityRank(f.Severity))
+                .ThenBy(f => f.File, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(f => f.Line)
+                .Take(3)
+                .ToList();
+
+            var largest = snapshot.Files
+                .Where(f => string.Equals(f.Category, "src", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(f => f.LineCount)
+                .ThenByDescending(f => f.SizeBytes)
+                .FirstOrDefault();
+
+            var actions = new List<string>();
+            if (findings.Count > 0)
+                actions.Add($"address highest-severity maintainability findings first ({string.Join(", ", findings.Select(f => $"{f.RuleId} at {f.File}:{f.Line}"))})");
+            if (largest is not null && largest.LineCount >= 1000)
+                actions.Add($"split oversized file {largest.RelativePath} ({largest.LineCount} lines)");
+            actions.Add("prioritize fixes in shared/core modules before leaf modules");
+
+            return $"For maintainability, fix first: {string.Join("; ", actions)}.";
+        }
+
+        if (ProductionImpactFindingsQuestion.IsMatch(question))
+        {
+            var prodFindings = GetEffectiveFindings(session)
+                .Where(f => IsProductionLikePath(f.File))
+                .OrderBy(f => SeverityRank(f.Severity))
+                .ThenBy(f => f.File, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(f => f.Line)
+                .Take(10)
+                .ToList();
+
+            if (prodFindings.Count == 0)
+                return "No production-path findings were detected in this indexed session.";
+
+            return $"Findings affecting production paths ({prodFindings.Count} shown): {string.Join("; ", prodFindings.Select(f => $"{f.Severity} {f.RuleId} at {f.File}:{f.Line}"))}.";
+        }
+
+        if (PerformanceHotspotsQuestion.IsMatch(question))
+        {
+            var perfFindings = GetEffectiveFindings(session)
+                .Where(f => f.Category == Domain.Insights.FindingCategory.Performance)
+                .OrderBy(f => SeverityRank(f.Severity))
+                .ThenBy(f => f.File, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(f => f.Line)
+                .Take(8)
+                .ToList();
+
+            var largeFiles = snapshot.Files
+                .Where(f => string.Equals(f.Category, "src", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(f => f.SizeBytes)
+                .Take(5)
+                .ToList();
+
+            var parts = new List<string>();
+            if (perfFindings.Count > 0)
+                parts.Add($"performance findings: {string.Join("; ", perfFindings.Select(f => $"{f.Severity} {f.RuleId} at {f.File}:{f.Line}"))}");
+            if (largeFiles.Count > 0)
+                parts.Add($"largest source files: {string.Join(", ", largeFiles.Select(f => $"{f.RelativePath} ({f.LineCount} lines, {f.SizeBytes} bytes)"))}");
+
+            return parts.Count == 0
+                ? "I can't find strong performance hotspots in this indexed session."
+                : $"Biggest performance hotspots from indexed data: {string.Join("; ", parts)}.";
+        }
+
+        if (PerformanceBeforeProdQuestion.IsMatch(question))
+        {
+            var actions = new List<string>();
+            var largeFiles = snapshot.Files
+                .Where(f => string.Equals(f.Category, "src", StringComparison.OrdinalIgnoreCase) && f.LineCount >= 900)
+                .OrderByDescending(f => f.LineCount)
+                .Take(3)
+                .ToList();
+
+            if (largeFiles.Count > 0)
+                actions.Add($"reduce very large files first ({string.Join(", ", largeFiles.Select(f => f.RelativePath))})");
+
+            var perfFindings = GetEffectiveFindings(session)
+                .Where(f => f.Category == Domain.Insights.FindingCategory.Performance)
+                .OrderBy(f => SeverityRank(f.Severity))
+                .Take(3)
+                .ToList();
+
+            if (perfFindings.Count > 0)
+                actions.Add($"resolve top performance findings ({string.Join(", ", perfFindings.Select(f => $"{f.RuleId} at {f.File}:{f.Line}"))})");
+
+            actions.Add("profile critical endpoints/workflows and cache repeated expensive operations");
+            actions.Add("add load/perf smoke tests in CI before production rollout");
+
+            return $"To improve performance before production: {string.Join("; ", actions)}.";
         }
 
         if (SecurityFindingsQuestion.IsMatch(question))
@@ -1057,6 +1255,16 @@ public sealed class ChatOrchestrator : IChatOrchestrator
             hints.Add("Go app startup likely begins at main.go.");
 
         return hints;
+    }
+
+    private static bool IsProductionLikePath(string path)
+    {
+        var p = path.Replace('\\', '/').ToLowerInvariant();
+        if (p.Contains("/test/") || p.Contains("/tests/") || p.Contains(".spec.") || p.Contains(".test."))
+            return false;
+        if (p.StartsWith("docs/") || p.Contains("/docs/"))
+            return false;
+        return true;
     }
 
     private static int SeverityRank(Domain.Insights.Severity severity)
