@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.IO.Compression;
+using System.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RepoIntel.Application.Abstractions;
@@ -70,6 +72,17 @@ public sealed class GitRepoFetcher : IRepoFetcher
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(
+                ex,
+                "Session {SessionId}: git executable unavailable; attempting GitHub archive fallback",
+                sessionId);
+
+            if (TryParseGithubRepo(url, out var owner, out var repo))
+            {
+                await FetchViaGithubArchiveAsync(sessionId, owner, repo, branch, workDir, ct).ConfigureAwait(false);
+                return new LocalRepoHandle(sessionId, workDir, branch, null);
+            }
+
             throw new InvalidOperationException(
                 "Failed to start 'git'. Ensure Git is installed and on PATH.", ex);
         }
@@ -140,4 +153,94 @@ public sealed class GitRepoFetcher : IRepoFetcher
 
     private static string Truncate(string s, int max) =>
         string.IsNullOrEmpty(s) ? s : s.Length <= max ? s : s[..max] + "…";
+
+    private static bool TryParseGithubRepo(string url, out string owner, out string repo)
+    {
+        owner = string.Empty;
+        repo = string.Empty;
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+
+        if (!string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var segs = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segs.Length < 2)
+            return false;
+
+        owner = segs[0];
+        repo = segs[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+            ? segs[1][..^4]
+            : segs[1];
+
+        return owner.Length > 0 && repo.Length > 0;
+    }
+
+    private async Task FetchViaGithubArchiveAsync(
+        string sessionId,
+        string owner,
+        string repo,
+        string? branch,
+        string workDir,
+        CancellationToken ct)
+    {
+        var branchOrHead = string.IsNullOrWhiteSpace(branch) ? "HEAD" : branch.Trim();
+        var archiveUrl = $"https://github.com/{owner}/{repo}/archive/refs/heads/{branchOrHead}.zip";
+
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("RepoIntel", "1.0"));
+
+        _logger.LogInformation(
+            "Session {SessionId}: downloading GitHub archive {ArchiveUrl}",
+            sessionId,
+            archiveUrl);
+
+        await using var response = await http.GetStreamAsync(archiveUrl, ct).ConfigureAwait(false);
+
+        var tempRoot = Path.Combine(Path.GetTempPath(), "repointel-archive", sessionId);
+        var zipPath = Path.Combine(tempRoot, "repo.zip");
+        var unzipPath = Path.Combine(tempRoot, "unzipped");
+
+        if (Directory.Exists(tempRoot))
+        {
+            try { Directory.Delete(tempRoot, recursive: true); } catch { }
+        }
+        Directory.CreateDirectory(tempRoot);
+
+        await using (var fs = File.Create(zipPath))
+        {
+            await response.CopyToAsync(fs, ct).ConfigureAwait(false);
+        }
+
+        Directory.CreateDirectory(unzipPath);
+        ZipFile.ExtractToDirectory(zipPath, unzipPath, overwriteFiles: true);
+
+        var extractedRoot = Directory
+            .EnumerateDirectories(unzipPath)
+            .FirstOrDefault() ?? unzipPath;
+
+        CopyDirectoryContents(extractedRoot, workDir);
+
+        try { Directory.Delete(tempRoot, recursive: true); } catch { }
+    }
+
+    private static void CopyDirectoryContents(string sourceDir, string targetDir)
+    {
+        Directory.CreateDirectory(targetDir);
+
+        foreach (var dir in Directory.EnumerateDirectories(sourceDir, "*", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(sourceDir, dir);
+            Directory.CreateDirectory(Path.Combine(targetDir, rel));
+        }
+
+        foreach (var file in Directory.EnumerateFiles(sourceDir, "*", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(sourceDir, file);
+            var dest = Path.Combine(targetDir, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            File.Copy(file, dest, overwrite: true);
+        }
+    }
 }
